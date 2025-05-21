@@ -1,24 +1,16 @@
-# Streamlit фронтенд
+# Streamlit фронтенд для загрузки Excel-файлов
 
 import streamlit as st
 import requests
-import io
 
 # URL бэкенд-сервера
 BACKEND_URL = "https://univer-coordinate-backend.onrender.com"
-# BACKEND_URL = "http://127.0.0.1:8000"  # для локального тестирования
 
 # Настройка интерфейса Streamlit
 st.title("Преобразование координатных данных")
 st.write("""
 Загрузите Excel-файл (.xlsx) с колонками `Name`, `X`, `Y`, `Z`, и получите Markdown-отчет
 с преобразованными координатами.
-""")
-
-# Шаблон файла для скачивания
-st.markdown("""
-[Скачать шаблон Excel-файла](https://docs.google.com/spreadsheets/d/1YOUR_TEMPLATE_ID/export?format=xlsx)
-(необязательно)
 """)
 
 # Загрузка файла
@@ -43,26 +35,24 @@ if uploaded_file is not None:
                 response = requests.post(
                     f"{BACKEND_URL}/process-excel/", 
                     files=files,
-                    timeout=30  # Таймаут 30 секунд
+                    timeout=30
                 )
 
                 if response.status_code == 200:
                     # Показ предпросмотра отчета
                     st.markdown("### Предпросмотр отчета")
-                    st.markdown(response.content.decode('utf-8')[:1000] + "...")  # Первые 1000 символов
+                    st.markdown(response.content.decode('utf-8')[:1000] + "...")
                     
                     # Кнопка для скачивания
                     st.download_button(
                         label="Скачать полный Markdown-отчет",
                         data=response.content,
                         file_name="coordinate_report.md",
-                        mime="text/markdown",
-                        help="Отчет содержит формулы преобразования и таблицы результатов"
+                        mime="text/markdown"
                     )
                     st.success("Преобразование выполнено успешно!")
                     
                 else:
-                    # Обработка ошибок
                     try:
                         error_detail = response.json().get('detail', response.text)
                     except ValueError:

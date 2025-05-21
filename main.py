@@ -1,6 +1,3 @@
-# FastAPI-бэкенд для обработки Excel
-
-
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import PlainTextResponse
 import pandas as pd
@@ -79,35 +76,75 @@ async def process_excel(file: UploadFile = File(...)):
         # Преобразование координат
         df_transformed = transform_coordinates(df, "СК-42", "ГСК-2011")
 
-        # Генерация отчета в памяти
-        report = generate_markdown(df, df_transformed, "СК-42", "ГСК-2011")
-
-        return PlainTextResponse(
-            content=report,
-            media_type="text/markdown",
-            headers={"Content-Disposition": "attachment; filename=report.md"}
-        )
-
     except Exception as e:
         raise HTTPException(500, detail=f"Ошибка обработки: {str(e)}")
+    
+def generate_markdown_report(df_before, df_after, sk1, sk2, parameters):
+    """Генерация Markdown-отчета в памяти (без сохранения в файл)"""
+    ΔX, ΔY, ΔZ, ωx, ωy, ωz, m = symbols('ΔX ΔY ΔZ ωx ωy ωz m')
+    X, Y, Z = symbols('X Y Z')
+    
+    general_formula = (1 + m) * Matrix([
+        [1, ωz, -ωy],
+        [-ωz, 1, ωx],
+        [ωy, -ωx, 1]
+    ]) @ Matrix([[X], [Y], [Z]]) + Matrix([[ΔX], [ΔY], [ΔZ]])
 
-def generate_markdown(df_before, df_after, sk1, sk2):
-    """Генерация Markdown полностью в памяти"""
+    p = parameters.get(sk1)
+    if p is None:
+        raise ValueError(f"Система {sk1} не найдена в параметрах")
+    
+    subs_common = {
+        ΔX: p["ΔX"], ΔY: p["ΔY"], ΔZ: p["ΔZ"],
+        ωx: p["ωx"], ωy: p["ωy"], ωz: p["ωz"],
+        m: p["m"] * 1e-6
+    }
+
+    # Собираем отчет в строку
     report = []
     report.append("# Отчёт по преобразованию координат\n\n")
     report.append(f"**Исходная система**: {sk1}  \n")
     report.append(f"**Конечная система**: {sk2}  \n\n")
 
-    return "".join(report)
+    report.append("## 1. Общая формула\n\n")
+    report.append(f"$$\n{latex(general_formula)}\n$$\n\n")
 
-# эндпоинт для корневого URL (/)
+    report.append("## 2. Формула с подстановкой параметров\n\n")
+    formula_p = general_formula.subs(subs_common)
+    report.append(f"$$\n{latex(formula_p)}\n$$\n\n")
+
+    first = df_before.iloc[0]
+    report.append("## 3. Пример для первой точки\n\n")
+    report.append(f"- Исходные: $X={first['X']},\\;Y={first['Y']},\\;Z={first['Z']}$  \n")
+    subs1 = {**subs_common, X: first["X"], Y: first["Y"], Z: first["Z"]}
+    f3 = general_formula.subs(subs1)
+    f3n = f3.applyfunc(N)
+    report.append(f"- Подстановка в формулу:  \n  $$\n{latex(f3)}\n$$\n")
+    report.append(f"- Численный результат: $X'={f3n[0]},\\;Y'={f3n[1]},\\;Z'={f3n[2]}$\n\n")
+
+    report.append("## 4. Таблица до и после и статистика\n\n")
+    report.append("| Name | X | Y | Z | X' | Y' | Z' |\n")
+    report.append("|---|---|---|---|---|---|---|\n")
+    
+    for (_, b), (_, a) in zip(df_before.iterrows(), df_after.iterrows()):
+        report.append(f"|{b['Name']}|{b['X']:.6f}|{b['Y']:.6f}|{b['Z']:.6f}|"
+                     f"{a['X']:.6f}|{a['Y']:.6f}|{a['Z']:.6f}|\n")
+
+    report.append("\n**Статистика (X', Y', Z'):**\n\n")
+    stats = df_after[["X", "Y", "Z"]].agg(["mean", "std"])
+    
+    for idx in stats.index:
+        s = stats.loc[idx]
+        report.append(f"- {idx}: X'={s['X']:.3f}, Y'={s['Y']:.3f}, Z'={s['Z']:.3f}\n")
+
+    return "".join(report)
 @app.get("/")
 async def health_check():
     return {"status": "ok", "systems": list(PARAMETERS.keys())}
 
 def keep_alive():
     while True:
-        time.sleep(300) # чтоб не засыпал
+        time.sleep(300)
         try:
             requests.get("https://univer-coordinate-backend.onrender.com")
         except:

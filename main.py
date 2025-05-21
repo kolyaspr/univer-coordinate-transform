@@ -11,7 +11,7 @@ from coordinate_transform import GSK_2011, generate_report_md
 # Инициализация FastAPI приложения
 app = FastAPI(
     title="Coordinate Transformation API",
-    description="API для преобразования систем координат"
+    description="API для преобразования систем координат из Excel-файлов"
 )
 
 # Корневой эндпоинт для проверки работы API
@@ -20,16 +20,16 @@ async def root():
     return {
         "message": "Coordinate Transformation API работает",
         "endpoints": {
-            "/process-csv/": "Загрузка и обработка CSV-файла с координатами"
+            "/process-excel/": "Загрузка и обработка Excel-файла с координатами"
         }
     }
 
-# Основной эндпоинт для обработки файлов
-@app.post("/process-csv/")
-async def process_csv(file: UploadFile = File(...)):
+# Основной эндпоинт для обработки Excel-файлов
+@app.post("/process-excel/")
+async def process_excel(file: UploadFile = File(...)):
     """
-    Обрабатывает загруженный CSV-файл с координатами:
-    1. Проверяет формат файла
+    Обрабатывает загруженный Excel-файл с координатами:
+    1. Проверяет формат файла (XLSX или XLS)
     2. Сохраняет во временный файл
     3. Читает данные в DataFrame
     4. Выполняет преобразование координат
@@ -38,38 +38,39 @@ async def process_csv(file: UploadFile = File(...)):
     """
     
     # Проверка расширения файла
-    if not file.filename.endswith('.csv'):
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
         raise HTTPException(
             status_code=400, 
-            detail="Требуется CSV-файл"
+            detail="Требуется файл Excel (.xlsx или .xls)"
         )
 
     # Создание временных файлов
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_input:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_input:
         input_path = tmp_input.name
         tmp_input.write(await file.read())
 
     output_md_path = tempfile.NamedTemporaryFile(delete=False, suffix=".md").name
+    output_excel_path = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
 
     try:
-        # Чтение данных из CSV
-        df = pd.read_csv(input_path)
+        # Чтение данных из Excel
+        df = pd.read_excel(input_path, engine='openpyxl')
         
         # Проверка необходимых колонок
         required_columns = ['Name', 'X', 'Y', 'Z']
         if not all(col in df.columns for col in required_columns):
             raise HTTPException(
                 status_code=400,
-                detail="CSV должен содержать колонки: Name, X, Y, Z"
+                detail="Excel файл должен содержать колонки: Name, X, Y, Z"
             )
 
         # Преобразование координат между системами
         df_transformed = GSK_2011(
-            sk1="СК-42",          # Исходная система координат
-            sk2="ГСК-2011",       # Целевая система координат
+            sk1="СК-42",               # Исходная система координат
+            sk2="ГСК-2011",            # Целевая система координат
             parameters_path="parameters.json",  # Файл параметров
-            df=df,                # Входные данные
-            save_path=None         # Не сохранять промежуточный результат
+            df=df,                     # Входные данные
+            save_path=None             # Не сохранять промежуточный результат
         )
 
         # Подготовка данных для отчета
@@ -81,13 +82,13 @@ async def process_csv(file: UploadFile = File(...)):
 
         # Генерация Markdown-отчета
         generate_report_md(
-            df_before=df,          # Исходные данные
-            sk1="СК-42",           # Исходная система
-            sk2="ГСК-2011",        # Целевая система
+            df_before=df,              # Исходные данные
+            sk1="СК-42",               # Исходная система
+            sk2="ГСК-2011",            # Целевая система
             parameters_path="parameters.json",
-            md_path=output_md_path, # Куда сохранить отчет
-            csv_before=None,        # Не сохранять CSV
-            csv_after=None         # Не сохранять CSV
+            md_path=output_md_path,     # Куда сохранить отчет
+            excel_before=None,          # Не сохранять исходный Excel
+            excel_after=None            # Не сохранять преобразованный Excel
         )
 
         # Возврат сгенерированного отчета
@@ -97,13 +98,26 @@ async def process_csv(file: UploadFile = File(...)):
             filename="report.md"
         )
 
-    # Обработка любых ошибок
+    except pd.errors.EmptyDataError:
+        raise HTTPException(
+            status_code=400,
+            detail="Excel файл пуст или не содержит данных"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка обработки: {str(e)}"
+            detail=f"Ошибка обработки Excel файла: {str(e)}"
         )
-# ошибка
+    finally:
+        # Удаление временных файлов
+        if os.path.exists(input_path):
+            os.unlink(input_path)
+        if os.path.exists(output_md_path):
+            os.unlink(output_md_path)
+        if os.path.exists(output_excel_path):
+            os.unlink(output_excel_path)
+
+# Функция для поддержания активности на render.com
 
 import threading
 import time

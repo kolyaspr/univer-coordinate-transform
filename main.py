@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 import pandas as pd
 import os
 import tempfile
+import uvicorn
 from coordinate_transform import GSK_2011, generate_report_md
 
 # Инициализация FastAPI приложения
@@ -102,3 +103,22 @@ async def process_csv(file: UploadFile = File(...)):
             status_code=500,
             detail=f"Ошибка обработки: {str(e)}"
         )
+# ошибка
+
+import threading
+import time
+import requests
+
+def keep_alive():
+    while True:
+        time.sleep(300)  # Каждые 5 минут
+        try:
+            requests.get("https://univer-coordinate-backend.onrender.com")
+        except:
+            pass
+
+if __name__ == "__main__":
+    t = threading.Thread(target=keep_alive)
+    t.daemon = True
+    t.start()
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

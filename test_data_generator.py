@@ -10,7 +10,7 @@ def generate_test_data(output_path="tests/test_data/sample1.xlsx"):
     "Y": [3000.0, 4000.0],
     "Z": [5000.0, 6000.0]
     }
-    pd.DataFrame(data).to_excel("correct_sample.xlsx", index=False)
+    pd.DataFrame(data).to_excel(output_path, index=False)
 
 def generate_invalid_data(output_path="tests/test_data/invalid.xlsx"):
     """Генерация данных с ошибками (неправильные колонки)"""

@@ -1,3 +1,6 @@
+# FastAPI-бэкенд для обработки Excel
+
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import PlainTextResponse
 import pandas as pd
@@ -94,19 +97,17 @@ def generate_markdown(df_before, df_after, sk1, sk2):
     report.append("# Отчёт по преобразованию координат\n\n")
     report.append(f"**Исходная система**: {sk1}  \n")
     report.append(f"**Конечная система**: {sk2}  \n\n")
-    
-    # Добавьте здесь остальную логику генерации отчета
-    # ...
-    
+
     return "".join(report)
 
+# эндпоинт для корневого URL (/)
 @app.get("/")
 async def health_check():
     return {"status": "ok", "systems": list(PARAMETERS.keys())}
 
 def keep_alive():
     while True:
-        time.sleep(300)
+        time.sleep(300) # чтоб не засыпал
         try:
             requests.get("https://univer-coordinate-backend.onrender.com")
         except:

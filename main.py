@@ -7,6 +7,14 @@ import os
 import tempfile
 import uvicorn
 from coordinate_transform import GSK_2011, generate_report_md
+import threading
+import time
+import requests
+import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Инициализация FastAPI приложения
 app = FastAPI(
@@ -44,92 +52,70 @@ async def process_excel(file: UploadFile = File(...)):
             detail="Требуется файл Excel (.xlsx или .xls)"
         )
 
-    # Создание временных файлов
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_input:
-        input_path = tmp_input.name
-        tmp_input.write(await file.read())
+    # Создаем временную директорию для всех файлов
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            # Сохраняем входной файл
+            input_path = os.path.join(temp_dir, "input.xlsx")
+            with open(input_path, "wb") as f:
+                f.write(await file.read())
 
-    output_md_path = tempfile.NamedTemporaryFile(delete=False, suffix=".md").name
-    output_excel_path = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
+            # Чтение данных из Excel
+            df = pd.read_excel(input_path, engine='openpyxl')
+            
+            # Проверка необходимых колонок
+            required_columns = ['Name', 'X', 'Y', 'Z']
+            if not all(col in df.columns for col in required_columns):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Excel файл должен содержать колонки: Name, X, Y, Z"
+                )
 
-    try:
-        # Чтение данных из Excel
-        df = pd.read_excel(input_path, engine='openpyxl')
-        
-        # Проверка необходимых колонок
-        required_columns = ['Name', 'X', 'Y', 'Z']
-        if not all(col in df.columns for col in required_columns):
-            raise HTTPException(
-                status_code=400,
-                detail="Excel файл должен содержать колонки: Name, X, Y, Z"
+            # Генерация отчета
+            report_path = os.path.join(temp_dir, "report.md")
+            generate_report_md(
+                df_before=df,
+                sk1="СК-42",
+                sk2="ГСК-2011",
+                parameters_path="parameters.json",
+                md_path=report_path
             )
 
-        # Преобразование координат между системами
-        df_transformed = GSK_2011(
-            sk1="СК-42",               # Исходная система координат
-            sk2="ГСК-2011",            # Целевая система координат
-            parameters_path="parameters.json",  # Файл параметров
-            df=df,                     # Входные данные
-            save_path=None             # Не сохранять промежуточный результат
-        )
+            # Проверяем что отчет создан
+            if not os.path.exists(report_path):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Не удалось сгенерировать отчет"
+                )
 
-        # Подготовка данных для отчета
-        df_transformed = df_transformed.rename(columns={
-            "X": "X_new",
-            "Y": "Y_new",
-            "Z": "Z_new"
-        })
+            # Возвращаем отчет
+            return FileResponse(
+                report_path,
+                media_type="text/markdown",
+                filename="coordinate_report.md"
+            )
 
-        # Генерация Markdown-отчета
-        generate_report_md(
-            df_before=df,              # Исходные данные
-            sk1="СК-42",               # Исходная система
-            sk2="ГСК-2011",            # Целевая система
-            parameters_path="parameters.json",
-            md_path=output_md_path,     # Куда сохранить отчет
-            excel_before=None,          # Не сохранять исходный Excel
-            excel_after=None            # Не сохранять преобразованный Excel
-        )
-
-        # Возврат сгенерированного отчета
-        return FileResponse(
-            output_md_path,
-            media_type="text/markdown",
-            filename="report.md"
-        )
-
-    except pd.errors.EmptyDataError:
-        raise HTTPException(
-            status_code=400,
-            detail="Excel файл пуст или не содержит данных"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка обработки Excel файла: {str(e)}"
-        )
-    finally:
-        # Удаление временных файлов
-        if os.path.exists(input_path):
-            os.unlink(input_path)
-        if os.path.exists(output_md_path):
-            os.unlink(output_md_path)
-        if os.path.exists(output_excel_path):
-            os.unlink(output_excel_path)
+        except pd.errors.EmptyDataError:
+            raise HTTPException(
+                status_code=400,
+                detail="Excel файл пуст или не содержит данных"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка обработки файла: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Ошибка обработки Excel файла: {str(e)}"
+            )
 
 # Функция для поддержания активности на render.com
-
-import threading
-import time
-import requests
-
 def keep_alive():
     while True:
         time.sleep(300)  # Каждые 5 минут
         try:
             requests.get("https://univer-coordinate-backend.onrender.com")
-        except:
-            pass
+            logger.info("Keep-alive request sent")
+        except Exception as e:
+            logger.warning(f"Keep-alive error: {str(e)}")
 
 if __name__ == "__main__":
     t = threading.Thread(target=keep_alive)

@@ -8,7 +8,6 @@ import threading
 import time
 import requests
 from sympy import symbols, Matrix, N, latex
-import os
 
 app = FastAPI(
     title="Coordinate Transformation API",
@@ -138,20 +137,3 @@ def generate_markdown_report(df_before, df_after, sk1, sk2, parameters):
         report.append(f"- {idx}: X'={s['X']:.3f}, Y'={s['Y']:.3f}, Z'={s['Z']:.3f}\n")
 
     return "".join(report)
-@app.get("/")
-async def health_check():
-    return {"status": "ok", "systems": list(PARAMETERS.keys())}
-
-def keep_alive():
-    while True:
-        time.sleep(300)
-        try:
-            requests.get("https://univer-coordinate-backend.onrender.com")
-        except:
-            pass
-
-if __name__ == "__main__":
-    t = threading.Thread(target=keep_alive)
-    t.daemon = True
-    t.start()
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

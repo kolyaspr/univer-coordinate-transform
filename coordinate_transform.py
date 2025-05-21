@@ -1,9 +1,11 @@
+# Логика функции преобразования координат и генерации отчета.
+
 import pandas as pd
 from sympy import symbols, Matrix, N
 import json
 
 def GSK_2011(sk1, sk2, parameters_path, df=None):
-    """Упрощенная версия без работы с файлами"""
+    """ без работы с файлами"""
     with open(parameters_path, 'r', encoding='utf-8') as f:
         parameters = json.load(f)
     

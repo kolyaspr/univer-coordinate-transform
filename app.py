@@ -6,7 +6,7 @@ import io
 
 # URL бэкенд-сервера
 
-# BACKEND_URL = "https://.com"
+BACKEND_URL = "https://univer-coordinate-backend.onrender.com"
 # BACKEND_URL = "http://127.0.0.1:8000" - локальный
 
 # интерфейс Streamlit

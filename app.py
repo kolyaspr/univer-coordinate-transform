@@ -13,7 +13,7 @@ st.write("""
 с преобразованными координатами.
 """)
 
-# Загрузка файла excel
+# Загрузка файла
 uploaded_file = st.file_uploader(
     "Выберите Excel-файл", 
     type=["xlsx", "xls"],
@@ -66,4 +66,4 @@ if uploaded_file is not None:
             except requests.exceptions.RequestException as e:
                 st.error(f"Ошибка подключения: {str(e)}")
             except Exception as e:
-                st.error(f"Неожиданная ошибка: {str(e)}")
+                st.error(f"Неожиданная ошибка: {str(e)}") 

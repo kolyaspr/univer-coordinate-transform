@@ -1,4 +1,4 @@
-# Streamlit фронтенд для загрузки Excel-файлов
+# Streamlit фронт
 
 import streamlit as st
 import requests
@@ -65,7 +65,5 @@ if uploaded_file is not None:
                 st.error("Превышено время ожидания ответа от сервера")
             except requests.exceptions.RequestException as e:
                 st.error(f"Ошибка подключения: {str(e)}")
-            # Покажет полный текст ошибки
             except Exception as e:
-                st.error(f"Ошибка сервера: {str(e)}")
-                st.text(f"Подробности: {response.text}")  
+                st.error(f"Неожиданная ошибка: {str(e)}")

@@ -17,8 +17,8 @@
 
 1. Клонируйте репозиторий:
    ```bash
-  git clone https://github.com/kolyaspr/univer-coordinate-transform.git
-  cd univer-coordinate-transform
+   git clone https://github.com/kolyaspr/univer-coordinate-transform.git
+   cd univer-coordinate-transform
    ```
    Замените `https://github.com/kolyaspr/univer-coordinate-transform` на URL вашего репозитория.
 

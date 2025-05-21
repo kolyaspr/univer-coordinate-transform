@@ -13,7 +13,7 @@ st.write("""
 с преобразованными координатами.
 """)
 
-# Загрузка файла
+# Загрузка файла excel
 uploaded_file = st.file_uploader(
     "Выберите Excel-файл", 
     type=["xlsx", "xls"],
